@@ -1,0 +1,359 @@
+---
+title: "Revisão de Conceitos e Prática - Projeto Integrador I"
+author: "Prof. MSc. Weslley Rodrigues"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Análise Exploratória de Dados e preparação para Mineração e Predição
+
+Este documento apresenta uma análise exploratória de dados (EDA) Trata-se do resultado da pesquisa State of Data Brasil - 2022.
+
+Vamos aprofundar a análise exploratória desta base que é sensacional.
+
+Essas são as bibliotecas necessárias (ou não). Guardem esta estrutura, seá útil no futuro (pacman).
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+if (!require(pacman)) install.packages("pacman")
+pacman::p_load(lubridate, ggplot2, dplyr, ggplottidyr, readr, prettydoc, maps, janitor, stringr, tidyr, magrittr, kable)
+```
+
+### **Parte 1: manipulação, limpeza e transformação de dados**
+
+Carregando nosso *Data Set* original: State of Data Brasil - 2022
+
+```{r dataset-original, echo=TRUE, message=FALSE, warning=FALSE}
+state_of_data_2023 <- read_csv("https://www.dropbox.com/scl/fi/3mhzl52pzfzhvetuwhbvh/State_of_data_BR_2023_Kaggle-df_survey_2023.csv?rlkey=tpne3g2cin8jkikpfk1oykxgq&st=ig017v2c&dl=1")
+colnames(state_of_data_2023)[1:20]
+```
+
+Agora vamos melhorar o cabeçalho do nosso conjunto de dados.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+dados_processados <- state_of_data_2023 %>% 
+  clean_names()# Limpa os nomes das colunas
+colnames(dados_processados)[1:20]
+ 
+```
+
+Ótimo !! Perceba que o nome das colunas (nossas variáveis) estão mais limpas e organizadas.
+
+------------------------------------------------------------------------
+
+## Parte 2. Validação e limpeza dos dados
+
+-   Vamos renomear as colunas do nosso conjunto de dados. Isso é importante para tornar mais fácil a referência às variáveis durante a análise.
+
+-   Sugiro sempre manter o padrão com **letras minúsculas e separadas por underline.**
+
+-   Outra ação importante: vamos selecionar, dentre as 353 variáveis (colunas) somente aquelas cque contém informações relevantes para a nossa análise.
+
+### Seleção dos dados relevantes (exemplificativo)
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Selecionando e renomeando colunas
+dados_selecionados <- dados_processados %>%
+  select(
+    id = p0_id,
+    idade = p1_a_idade,
+    faixa_idade = p1_a_1_faixa_idade,
+    genero = p1_b_genero,
+    cor_raca_etnia = p1_c_cor_raca_etnia,
+    pcd = p1_d_pcd,
+    vive_no_brasil = p1_g_vive_no_brasil,
+    estado_onde_mora = p1_i_estado_onde_mora,
+    experiencia_dados = p2_i_quanto_tempo_de_experiencia_na_area_de_dados_voce_tem,
+    faixa_salarial = p2_h_faixa_salarial,
+    remuneracao = p2_o_1_remuneracao_salario,
+    atuacao = p4_a_1_atuacao
+  ) %>%
+  # O tratamento de dados ausentes ou formatos específicos pode ser feito aqui
+  mutate(
+    vive_no_brasil = as.logical(vive_no_brasil),
+    faixa_idade = as.factor(faixa_idade),
+    genero = as.factor(genero),
+    cor_raca_etnia = as.factor(cor_raca_etnia),
+    pcd = as.factor(pcd),
+    atuacao = as.factor(atuacao)
+  ) #caso fossemos retirar os valores vazios, poderíamos usar a função "drop_na()" aqui
+head(dados_selecionados)
+```
+
+Mais Suave !!! Agora temos um conjunto de dados mais enxuto e organizado, pronto para ser explorado e analisado.
+
+### Ajuste nas categorias de variáveis
+
+Nesta etapa vamos ajustar as categorias das variáveis para facilitar a análise e interpretação dos dados. No caso específico estamos criando uma variável numérica para a experiência em dados e para a faixa salarial. Isso facilitará a análise e comparação dessas variáveis em futuras etapas.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Transformações e conversões
+dados_tratados <- dados_selecionados%>%
+  mutate(
+    experiencia_dados_num = case_when(
+      experiencia_dados == "Menos de 1 ano" ~ 0.5,
+      experiencia_dados == "de 1 a 2 anos" ~ 1.5,
+      experiencia_dados == "de 3 a 4 anos" ~ 3.5,
+      experiencia_dados == "de 4 a 6 anos" ~ 5,
+      experiencia_dados == "de 6 a 8 anos" ~ 7,
+      experiencia_dados == "Mais de 10 anos" ~ 10,
+      TRUE ~ as.numeric(NA) # Caso não se encaixe em nenhuma categoria
+    ),
+    faixa_salarial_num = as.numeric(str_extract(faixa_salarial, "\\d+")) +
+    as.numeric(str_extract(str_extract(faixa_salarial, "/mês a R\\$ [\\d\\.]+"), "\\d+")) / 2
+  ) %>% #
+  drop_na(experiencia_dados_num, faixa_salarial_num) #aqui vamos deixar os campos vazio de lado.
+head(dados_tratados)
+```
+
+### Revisão dessas funções:
+
+-   Pense no "mutate" como uma ferramenta que nos permite moldar e refinar nossos dados brutos.
+
+-   No contexto da nossa aula, usamos o mutate para criar novas colunas que simplificam e padronizam as informações complexas que temos.
+
+-   Por exemplo, transformamos a experiência de trabalho, que estava em texto, em números que representam anos, facilitando análises futuras.
+
+-   Da mesma forma, convertemos faixas salariais, que eram intervalos, em um único valor numérico médio.
+
+-   Ao final desse processo, teremos um conjunto de dados limpo e organizado, pronto para ser explorado e analisado em profundidade.
+
+    ------------------------------------------------------------------------
+
+## Parte 3: Análise Explotatória de Dados
+
+Vocês já sabem o que é a famosa AED (ou EDA para quem já baixou o Duolingo o smartphone).
+
+Nossa meta é identificar tendências, variações, anomalias e outras características dinâmicas presentes no conjunto de dados.
+
+Esses insights são fundamentais para qualquer análise subsequente e para tomar decisões baseadas em dados concretos.
+
+### O início: análise descritiva
+
+Esta etapa, Gênios, é a peça inaugural padrão ouro da análise de dados.
+
+Vamos resumir e descrever as características principais do nosso conjunto de dados.
+
+Insights poderosos podem ser extraídos dessa análise, então vamos em frente.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+kable(summary(dados_tratados), format = "markdown", caption = "Resumo dos Dados Tratados")
+```
+
+```{}
+```
+
+### Análise Etária
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(dados_tratados, aes(x = idade)) +
+  geom_histogram(bins = 30, fill = "#66cc66", color = "#1a421a") +  # Verde como cor de preenchimento
+  labs(title = "Distribuição de Idades", x = "Idade", y = "Frequência") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_fill_gradient(low = "lightgreen", high = "darkgreen") +  # Gradiente de verde
+  geom_vline(aes(xintercept = mean(idade, na.rm = TRUE)), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(dados_tratados$idade, na.rm = TRUE), y = max(table(cut(dados_tratados$idade, breaks = 30))), label = "Média", vjust = -1, color = "red")
+
+```
+
+### Boxplot de Faixa Salarial por Gênero
+
+O Boxplot é uma ferramenta poderosa para visualizar a distribuição de dados numéricos e identificar padrões e tendências.
+
+Para utilizá-lo, as variáveis devem ser numéricas e categóricas, como é o caso da faixa salarial e do gênero.
+
+Nesta disciplina, vamoss abordar muitas vezes a necessidade de adequação do tipo de variável para a análise. E quais visualizações são mais adequadas para cada tipo de variável.
+
+Isto os deixará um passo à gfrente para o Projeto Integrador II.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(dados_tratados, aes(x = genero, y = faixa_salarial_num)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Salários por Gênero", x = "Gênero", y = "Faixa Salarial")
+```
+
+#### **Componentes Visuais**:
+
+-   **Intervalo Interquartil (IQR)**: Mostra a variação dos salários.
+
+-   **Mediana**: Representa o valor central da distribuição salarial.
+
+-   **Whiskers (Antenas)**: Indicam a variabilidade fora do IQR.
+
+-   **Outliers**: Pontos que refletem variações ou anomalias na distribuição.
+
+#### **Análise de Disparidades**:
+
+-   **Disparidades de Gênero**: Mulheres tendem a ter salários mais baixos.
+
+-   **Grupo 'Prefiro não informar'**: Apresenta menor variação salarial, possivelmente devido a uma amostra menor ou mais uniforme.
+
+### Contagem de Profissionais por Faixa de Experiência
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+dados_tratados %>%
+  count(experiencia_dados) %>%
+  ggplot(aes(x = reorder(experiencia_dados, n), y = n, fill = experiencia_dados)) +
+  geom_col() +
+  labs(title = "Contagem de Profissionais por Faixa de Experiência", x = "Faixa de Experiência", y = "Número de Profissionais") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Relação entre Idade e Faixa Salarial
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(dados_tratados, aes(x = idade, y = faixa_salarial_num)) +
+  geom_point(alpha = 0.6, size = 3) +
+  labs(title = "Relação entre Idade e Faixa Salarial", x = "Idade", y = "Faixa Salarial (Numérica)") +
+  theme_minimal()
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(dados_tratados, aes(x = idade, y = faixa_salarial_num)) +
+  geom_tile(aes(fill = ..density..), stat = "bin2d", bins = 50) +  # Aumenta o número de bins para maior detalhamento
+  scale_fill_viridis_c(option = "inferno", direction = -1, name = "Densidade") +  # Ajuste de escala de cores e legenda
+  labs(title = "Mapa de Calor da Faixa Salarial por Idade",
+       subtitle = "Análise da densidade de faixas salariais por diferentes idades",
+       x = "Idade",
+       y = "Faixa Salarial (Numérica)") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(face = "italic", hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.background = element_rect(fill = "black"),
+        panel.background = element_rect(fill = "black"),
+        panel.grid.major = element_line(color = "gray50"),
+        panel.grid.minor = element_blank(),
+        axis.text = element_text(color = "white"),
+        axis.title = element_text(color = "white"),
+        legend.background = element_rect(fill = "black"),
+        legend.text = element_text(color = "white"),
+        legend.title = element_text(face = "bold", color = "white"))
+
+```
+
+### ⚠️PARA TUDO⚠️
+
+Vamos olhar isto com um pouco mais de atenção.
+
+### **Faixa Salarial de 20 mil (ou mais):**
+
+-   **Faixa Etária**
+
+    -   A faixa de 20k BRL aparece de maneira significativa [**em torno dos 25 a 30 anos.**]{.underline}
+
+    -   Isso indica que, com dedicação, experiência adquirida e o desenvolvimento contínuo de habilidades, muitos profissionais podem alcançar essa faixa salarial bem antes dos 30 anos.
+
+### **Tempo Estimado para Alcançar os 20 mil reais:**
+
+-   **Aproximadamente 5 a 10 anos**
+
+    -   Com um plano de carreira bem traçado, participação em projetos relevantes, contínua atualização e especialização, que (considerando uma média de 20 anos e quinto semestre)alcancem a faixa de 20k BRL por volta dos **25 a 30 anos**.
+
+### **Fatores que Podem Acelerar o Crescimento:**
+
+1.  **Investimento em Qualificação:** Cursos de especialização, certificações e treinamentos contínuos em tecnologias emergentes.
+
+2.  **Participação em Projetos Impactantes:** Trabalhar em projetos que gerem valor real para as empresas ou que tragam visibilidade no mercado.
+
+3.  **Networking e Mentoria:** Estabelecer contatos com profissionais experientes e buscar mentores que possam guiar a carreira.
+
+4.  **Flexibilidade e Adaptação:** Estar aberto a mudanças de áreas ou de nichos dentro do campo da ciência de dados, explorando oportunidades em setores de alto crescimento.
+
+EM SUMA: Estuda, Gênio!!!
+
+### Distribuição de Profissionais por Atuação
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+dados_tratados %>%
+  count(atuacao) %>%
+  ggplot(aes(x = reorder(atuacao, n), y = n, fill = atuacao)) +
+  geom_col() +
+  labs(title = "Distribuição de Profissionais por Atuação", x = "Área de Atuação", y = "Número de Profissionais") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Proporção de Profissionais que Vivem no Brasil
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+dados_tratados %>%
+  count(vive_no_brasil) %>%
+  ggplot(aes(x = vive_no_brasil, y = n, fill = vive_no_brasil)) +
+  geom_col() +
+  labs(title = "Proporção de Profissionais que Vivem no Brasil", x = "Vive no Brasil", y = "Número de Profissionais") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+### Distribuição de Profissionais por Estado no Brasil
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(magrittr)
+library(ggplot2)
+dados_tratados %>%
+    filter(!is.na(estado_onde_mora)) %>%  # Remove linhas onde o estado é NA
+    count(estado_onde_mora) %>%
+  top_n(10, n) %>%  # Seleciona os 10 estados com mais registros
+  ggplot(aes(x = reorder(estado_onde_mora, n), y = n, fill = estado_onde_mora)) +
+  geom_col() +
+  labs(title = "Top 10 Estados com Mais Profissionais no Brasil", x = "Estado", y = "Número de Profissionais") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Conclusão das análises
+
+-   Nesta análise exploratória de dados, pudemos identificar padrões e tendências relevantes no conjunto de dados do mercado de dados.
+
+-   A distribuição de idades dos profissionais é ampla, com a maioria concentrada entre 25 e 35 anos.
+
+-   O boxplot de faixa salarial por gênero mostra uma distribuição semelhante entre homens e mulheres, com algumas diferenças notáveis.
+
+-   A contagem de profissionais por faixa de experiência revela que a maioria dos profissionais tem entre 1 e 5 anos de experiência em dados.
+
+-   A relação entre idade e faixa salarial mostra uma tendência geral de aumento salarial com a idade, com algumas variações entre os gêneros.
+
+-   Além disto, visualimos um pouquinho a distribuição geográfica dos profissionais de dados.
+
+------------------------------------------------------------------------
+
+## Conclusão da Aula
+
+#### Um texto para lerem depois e fixar o que vimos hoje.
+
+Todo o conteúdo de hoje, será revisitado e aprofundado nas próximas aulas e no curso de Introdução ao R que vocês terão no próximo semestre.
+
+O importante agora não é memorizar os códigos, mas sim entender os resultados que eles nos ajudam a alcançar e a lógica por trás de nossa construção analítica.
+
+Ao longo desta aula, exploramos os fundamentos da Ciência de Dados e como ela se aplica no mundo dos negócios. Vimos como formular perguntas claras e mensuráveis, coletar e preparar dados, e realizar uma Análise Exploratória de Dados (EDA) para descobrir tendências e padrões.
+
+Aprofundamos em técnicas de mineração de dados, como o clustering, e discutimos a importância do pensamento analítico na interpretação desses padrões.
+
+Também abordamos a implementação de soluções de Ciência de Dados e a comunicação eficaz dos resultados, habilidades essenciais para qualquer cientista de dados.
+
+Por fim, entramos no território da modelagem e interpretação, onde aplicamos técnicas estatísticas e de aprendizado de máquina para construir modelos preditivos. Aprendemos a interpretar os resultados desses modelos e a traduzi-los em insights acionáveis.
+
+Lembrem-se, a Ciência de Dados é uma ação contínua de aprendizado e descoberta.
+
+### See You Soon!
